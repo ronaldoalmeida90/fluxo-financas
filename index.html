@@ -1,0 +1,825 @@
+bash
+
+cat > /mnt/user-data/outputs/index.html << 'ENDOFFILE'
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="Fluxo"/>
+  <title>Fluxo Finanças</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f0f2f5; font-family: 'Nunito', sans-serif; }
+    #root { max-width: 430px; margin: 0 auto; min-height: 100vh; }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useRef, useEffect } = React;
+
+const API_URL = "https://script.google.com/macros/s/AKfycbzGQ2FbddPYqF-PXzsDi5eV9Z7fn-YKlWRJV2cb4igFWpcXVL8gMcCSDaT5J1qSzt4/exec";
+
+const FORMAS_PAGAMENTO = [
+  { id:"NUBANK_C",    label:"Nubank Crédito",      icon:"💜", short:"NU CRÉ",  cor:"#7c3aed" },
+  { id:"NUBANK_D",    label:"Nubank Débito",        icon:"💜", short:"NU DÉB",  cor:"#6d28d9" },
+  { id:"SANTANDER_C", label:"Santander Crédito",    icon:"🔴", short:"SAN CRÉ", cor:"#dc2626" },
+  { id:"SANTANDER_D", label:"Santander Débito",     icon:"🔴", short:"SAN DÉB", cor:"#b91c1c" },
+  { id:"ITAU_C",      label:"Itaú Crédito",         icon:"🟠", short:"ITÁ CRÉ", cor:"#ea580c" },
+  { id:"ITAU_D",      label:"Itaú Débito",          icon:"🟠", short:"ITÁ DÉB", cor:"#c2410c" },
+  { id:"BRADESCO_C",  label:"Bradesco Crédito",     icon:"🔵", short:"BRA CRÉ", cor:"#1d4ed8" },
+  { id:"BRADESCO_D",  label:"Bradesco Débito",      icon:"🔵", short:"BRA DÉB", cor:"#1e40af" },
+  { id:"BB_C",        label:"Banco do Brasil Cré.", icon:"🟡", short:"BB CRÉ",  cor:"#ca8a04" },
+  { id:"BB_D",        label:"Banco do Brasil Déb.", icon:"🟡", short:"BB DÉB",  cor:"#a16207" },
+  { id:"CAIXA_C",     label:"Caixa Crédito",        icon:"🟢", short:"CAI CRÉ", cor:"#15803d" },
+  { id:"CAIXA_D",     label:"Caixa Débito",         icon:"🟢", short:"CAI DÉB", cor:"#166534" },
+  { id:"INTER_C",     label:"Inter Crédito",        icon:"🟧", short:"INT CRÉ", cor:"#c2410c" },
+  { id:"INTER_D",     label:"Inter Débito",         icon:"🟧", short:"INT DÉB", cor:"#9a3412" },
+  { id:"C6_C",        label:"C6 Bank Crédito",      icon:"⬛", short:"C6 CRÉ",  cor:"#374151" },
+  { id:"C6_D",        label:"C6 Bank Débito",       icon:"⬛", short:"C6 DÉB",  cor:"#1f2937" },
+  { id:"CAJU",        label:"Caju",                 icon:"🟠", short:"CAJU",    cor:"#d97706" },
+  { id:"DINHEIRO",    label:"Dinheiro",             icon:"💵", short:"DIN",     cor:"#16a34a" },
+  { id:"PIX",         label:"Pix",                  icon:"💠", short:"PIX",     cor:"#0891b2" },
+  { id:"OUTRO",       label:"Outro",                icon:"💳", short:"OUTRO",   cor:"#64748b" },
+];
+
+const CATEGORIAS = [
+  {label:"Alimentação",icon:"🍽️",key:"ALIMENTACAO"},
+  {label:"Mercado",icon:"🛒",key:"MERCADO"},
+  {label:"Água",icon:"💧",key:"AGUA"},
+  {label:"Energia",icon:"💡",key:"ENERGIA"},
+  {label:"Gás",icon:"🔥",key:"GAS"},
+  {label:"Internet",icon:"📡",key:"INTERNET"},
+  {label:"Telefone",icon:"📱",key:"TELEFONE"},
+  {label:"Streaming",icon:"📺",key:"STREAMING"},
+  {label:"Moradia",icon:"🏠",key:"MORADIA"},
+  {label:"IPTU",icon:"📋",key:"IPTU"},
+  {label:"Carro",icon:"🚗",key:"CARRO"},
+  {label:"Moto",icon:"🏍️",key:"MOTO"},
+  {label:"Gasolina",icon:"⛽",key:"GASOLINA"},
+  {label:"Seguro Auto",icon:"🛡️",key:"SEGURO_AUTO"},
+  {label:"IPVA",icon:"📋",key:"IPVA"},
+  {label:"Transporte",icon:"🚌",key:"TRANSPORTE"},
+  {label:"Saúde",icon:"🏥",key:"SAUDE"},
+  {label:"Farmácia",icon:"💊",key:"FARMACIA"},
+  {label:"Fitness",icon:"🏋️",key:"FITNESS"},
+  {label:"Lanche",icon:"🍔",key:"LANCHE"},
+  {label:"Lazer",icon:"🎉",key:"LAZER"},
+  {label:"Compras",icon:"🛍️",key:"COMPRAS"},
+  {label:"Educação",icon:"📚",key:"APERFEICOAMENTO"},
+  {label:"Pet",icon:"🐾",key:"PET"},
+  {label:"Doação",icon:"💝",key:"DOACAO"},
+  {label:"Presente",icon:"🎁",key:"PRESENTE"},
+  {label:"Negócio",icon:"💼",key:"NEGOCIO"},
+  {label:"Beleza",icon:"✨",key:"BELEZA"},
+  {label:"Banco",icon:"🏦",key:"BANCARIO"},
+  {label:"Angelus",icon:"⛪",key:"ANGELUS"},
+  {label:"Outros",icon:"💰",key:"OUTROS"},
+];
+
+const FORNECEDORES_BASE = [
+  "BAITA SUPER","SABESP","CPFL ENERGIA","COMGÁS","CLARO","VIVO","TIM",
+  "NETFLIX","AMAZON PRIME","SPOTIFY","DISNEY+","MAX","GLOBOPLAY",
+  "BV FINANCEIRA","PORTO SEGURO","BRADESCO SEGUROS",
+  "FARMÁCIA SÃO PAULO","DROGASIL","DROGA RAIA","ULTRAFARMA",
+  "IFOOD","RAPPI","UBER EATS","UBER","99",
+  "AMERICANAS","MAGAZINE LUIZA","AMAZON","MERCADO LIVRE",
+  "SMART FIT","BODYTECH","NUBANK","SANTANDER","CONDOMÍNIO","ALUGUEL",
+];
+
+const TIPOS_DESPESA = ["FIXA","FIXA TEMPORARIA","VARIAVEL"];
+const RELEVANCIA    = ["ESSENCIAL","NÃO ESSENCIAL"];
+const STATUS_LIST   = ["PENDENTE","PAGO","COMPROMETIDO"];
+const MONTH_NAMES   = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+const fmt = v => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v||0);
+const fmtShort = v => { const n=Math.abs(v||0); if(n>=1000) return (v<0?"-":"")+"R$"+(n/1000).toFixed(1)+"k"; return fmt(v); };
+function fmtDate(d){ if(!d) return "—"; const s=String(d); if(s.includes("/")) return s; const p=s.split("-"); if(p.length===3) return p[2]+"/"+p[1]; return s; }
+function getCatInfo(key){ return CATEGORIAS.find(c=>c.key===key)||{label:key||"Outros",icon:"💰",key:key||"OUTROS"}; }
+function getForma(id){ return FORMAS_PAGAMENTO.find(f=>f.id===id)||{label:id,icon:"💳",short:id,cor:"#64748b"}; }
+function gerarId(){ return Date.now()+"_"+Math.random().toString(36).slice(2,7); }
+function mesAtual(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+
+function buildUrl(params){
+  const p = new URLSearchParams();
+  Object.entries(params).forEach(([k,v])=>{ if(v!==undefined&&v!==null) p.append(k,String(v)); });
+  return API_URL+"?"+p.toString();
+}
+
+async function apiGet(params){
+  try {
+    const res = await fetch(buildUrl(params));
+    return await res.json();
+  } catch(e){ return null; }
+}
+
+async function apiSend(params){
+  try {
+    await fetch(buildUrl(params));
+  } catch(e){}
+  return true;
+}
+
+function App(){
+  const [records,setRecords]           = useState([]);
+  const [fornecedores,setFornecedores] = useState([...FORNECEDORES_BASE]);
+  const [salarios,setSalarios]         = useState({});
+  const [mes,setMes]                   = useState(mesAtual());
+  const [tab,setTab]                   = useState("home");
+  const [editRec,setEditRec]           = useState(null);
+  const [toast,setToast]               = useState(null);
+  const [confirmDel,setConfirmDel]     = useState(null);
+  const [formaFiltro,setFormaFiltro]   = useState(null);
+  const [loading,setLoading]           = useState(true);
+  const [syncing,setSyncing]           = useState(false);
+  const [showCalc,setShowCalc]         = useState(false);
+
+  function showToast(msg,type="success"){ setToast({msg,type}); setTimeout(()=>setToast(null),2800); }
+
+  useEffect(()=>{
+    async function load(){
+      setLoading(true);
+      try {
+        const [desps,forns,cfg] = await Promise.all([
+          apiGet({action:"listar"}),
+          apiGet({action:"fornecedores"}),
+          apiGet({action:"config"}),
+        ]);
+        if(Array.isArray(desps)&&desps.length>0) setRecords(desps);
+        if(Array.isArray(forns)&&forns.length>0) setFornecedores([...new Set([...FORNECEDORES_BASE,...forns])].sort());
+        if(cfg&&typeof cfg==="object"){
+          const sals={};
+          Object.entries(cfg).forEach(([k,v])=>{ if(k.startsWith("salario_")) sals[k.replace("salario_","")]=parseFloat(v)||0; });
+          if(Object.keys(sals).length>0) setSalarios(sals);
+        }
+      } catch(e){ showToast("Erro ao carregar","error"); }
+      setLoading(false);
+    }
+    load();
+  },[]);
+
+  const salario   = salarios[mes]||0;
+  const recsMes   = useMemo(()=>records.filter(r=>r.periodo===mes),[records,mes]);
+  const totaisMes = useMemo(()=>{
+    let total=0,pago=0,pendente=0,ronaldo=0,vanessa=0;
+    recsMes.forEach(r=>{
+      const t=(parseFloat(r.ronaldo)||0)+(parseFloat(r.vanessa)||0);
+      total+=t; ronaldo+=parseFloat(r.ronaldo)||0; vanessa+=parseFloat(r.vanessa)||0;
+      if(r.status==="PAGO") pago+=t; else pendente+=t;
+    });
+    return {total,pago,pendente,ronaldo,vanessa,saldo:salario-total};
+  },[recsMes,salario]);
+
+  const porForma = useMemo(()=>{
+    const m={};
+    recsMes.forEach(r=>{
+      if(!m[r.forma]) m[r.forma]={total:0,pago:0,count:0};
+      const t=(parseFloat(r.ronaldo)||0)+(parseFloat(r.vanessa)||0);
+      m[r.forma].total+=t;
+      if(r.status==="PAGO") m[r.forma].pago+=t;
+      m[r.forma].count++;
+    });
+    return m;
+  },[recsMes]);
+
+  const recsVisiveis = useMemo(()=>{
+    if(!formaFiltro) return recsMes;
+    return recsMes.filter(r=>r.forma===formaFiltro);
+  },[recsMes,formaFiltro]);
+
+  async function saveRecord(data){
+    setSyncing(true);
+    const isUpdate = data.id && records.find(r=>String(r.id)===String(data.id));
+    if(isUpdate){
+      setRecords(p=>p.map(r=>String(r.id)===String(data.id)?data:r));
+      await apiSend({action:"update",...data});
+      showToast("Despesa atualizada ✓");
+    } else {
+      const newRec={...data,id:gerarId()};
+      setRecords(p=>[...p,newRec]);
+      await apiSend({action:"save",...newRec});
+      showToast("Salvo na planilha ✓");
+    }
+    setSyncing(false);
+    setTab("despesas"); setEditRec(null);
+  }
+
+  async function deleteRecord(id){
+    setSyncing(true);
+    setRecords(p=>p.filter(r=>String(r.id)!==String(id)));
+    await apiSend({action:"delete",id});
+    showToast("Excluída","warn");
+    setSyncing(false);
+    setConfirmDel(null); setTab("despesas");
+  }
+
+  async function saveSalario(valor){
+    setSalarios(p=>({...p,[mes]:valor}));
+    await apiSend({action:"saveConfig",chave:"salario_"+mes,valor});
+  }
+
+  async function addFornecedor(nome){
+    const n=nome.trim().toUpperCase();
+    if(!n||fornecedores.includes(n)) return;
+    setFornecedores(p=>[...p,n].sort());
+    await apiSend({action:"saveFornecedor",nome:n});
+  }
+
+  function openEdit(r){ setEditRec({...r}); setTab("nova"); }
+  function openDuplica(r){ const {id,...rest}=r; setEditRec({...rest,id:null,status:"PENDENTE"}); setTab("nova"); }
+  function openNova(){ setEditRec(null); setTab("nova"); }
+
+  if(loading) return React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:"#f0f2f5",gap:16}},
+    React.createElement("div",{className:"spinner"}),
+    React.createElement("p",{style:{color:"#64748b",fontWeight:700}},"Carregando sua planilha...")
+  );
+
+  return (
+    <div className="root">
+      {tab!=="nova" && (
+        <header className="header">
+          <div className="header-left">
+            <h1 className="app-name">Fluxo</h1>
+            <MonthNav mes={mes} onChange={setMes}/>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {tab==="home" && <div className="header-sal"><span className="sal-label">Salário</span><SalarioInline value={salario} onChange={saveSalario}/></div>}
+            <button className="calc-btn" onClick={()=>setShowCalc(true)}>🧮</button>
+            {syncing && <div className="sync-dot"/>}
+          </div>
+        </header>
+      )}
+      <main className="main">
+        {tab==="home"          && <HomeTab totais={totaisMes} salario={salario} porForma={porForma} records={recsMes} onFormaClick={f=>{setFormaFiltro(f);setTab("despesas");}}/>}
+        {tab==="despesas"      && <DespesasTab records={recsVisiveis} allRecords={recsMes} formaFiltro={formaFiltro} setFormaFiltro={setFormaFiltro} onEdit={openEdit} onDuplica={openDuplica} onDelete={id=>setConfirmDel(id)}/>}
+        {tab==="nova"          && <NovaTab initial={editRec} onSave={saveRecord} onCancel={()=>{setEditRec(null);setTab("despesas");}} fornecedores={fornecedores} addFornecedor={addFornecedor} mes={mes} syncing={syncing} onCalc={()=>setShowCalc(true)}/>}
+        {tab==="configuracoes" && <ConfigTab fornecedores={fornecedores} setFornecedores={setFornecedores} addFornecedor={addFornecedor}/>}
+      </main>
+      <nav className="bottom-nav">
+        {[
+          {id:"home",icon:"🏠",label:"Início"},
+          {id:"despesas",icon:"💳",label:"Despesas"},
+          {id:"nova",icon:"+",label:"Nova",fab:true},
+          {id:"configuracoes",icon:"⚙️",label:"Config"},
+        ].map(n=>(
+          <button key={n.id} className={"nav-btn"+(n.fab?" nav-fab":"")+(tab===n.id&&!n.fab?" nav-active":"")}
+            onClick={()=>n.fab?openNova():setTab(n.id)}>
+            <span style={{fontSize:n.fab?26:20}}>{n.icon}</span>
+            {!n.fab&&<span className="nav-label">{n.label}</span>}
+          </button>
+        ))}
+      </nav>
+      {toast && <div className={"toast toast-"+toast.type}>{toast.msg}</div>}
+      {showCalc && <Calculadora onClose={()=>setShowCalc(false)}/>}
+      {confirmDel && (
+        <div className="overlay" onClick={()=>setConfirmDel(null)}>
+          <div className="sheet" onClick={e=>e.stopPropagation()}>
+            <div className="sheet-handle"/>
+            <p className="sheet-title">Excluir despesa?</p>
+            <p className="sheet-sub">Essa ação não pode ser desfeita.</p>
+            <button className="btn-danger full" onClick={()=>deleteRecord(confirmDel)}>Excluir</button>
+            <button className="btn-ghost full mt8" onClick={()=>setConfirmDel(null)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Calculadora({onClose}){
+  const [total,setTotal]=useState("");
+  const [pctR,setPctR]=useState(50);
+  const [modo,setModo]=useState("igual");
+  const totalN=parseFloat(total)||0;
+  const valR=modo==="igual"?totalN/2:totalN*pctR/100;
+  const valV=modo==="igual"?totalN/2:totalN*(100-pctR)/100;
+  function pressNum(n){ setTotal(p=>p==="0"?n:p+n); }
+  function pressDecimal(){ setTotal(p=>p.includes(".")?p:(p||"0")+"."); }
+  function pressBack(){ setTotal(p=>p.length<=1?"":p.slice(0,-1)); }
+  const btns=[["7","8","9"],["4","5","6"],["1","2","3"],[".",  "0","⌫"]];
+  return(
+    <div className="overlay" onClick={onClose}>
+      <div className="sheet calc-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="sheet-handle"/>
+        <div className="calc-header"><span className="calc-title">🧮 Calculadora de Divisão</span><button className="close-btn" onClick={onClose}>✕</button></div>
+        <div className="calc-display"><span className="calc-display-label">Valor total</span><span className="calc-display-val">{total?fmt(parseFloat(total)||0):"R$ 0,00"}</span></div>
+        <div className="seg-ctrl mb12">
+          <button className={"seg-btn"+(modo==="igual"?" seg-on":"")} onClick={()=>setModo("igual")}>Igual</button>
+          <button className={"seg-btn"+(modo==="percentual"?" seg-on":"")} onClick={()=>setModo("percentual")}>% Personalizado</button>
+        </div>
+        {modo==="percentual"&&(
+          <div className="pct-row">
+            <div className="pct-item"><span className="pct-name">Ronaldo</span><div style={{display:"flex",alignItems:"center",gap:6}}><button className="pct-btn" onClick={()=>setPctR(p=>Math.max(0,p-5))}>−</button><span className="pct-val">{pctR}%</span><button className="pct-btn" onClick={()=>setPctR(p=>Math.min(100,p+5))}>+</button></div></div>
+            <div className="pct-divider"/>
+            <div className="pct-item"><span className="pct-name">Vanessa</span><div style={{display:"flex",alignItems:"center",gap:6}}><button className="pct-btn" onClick={()=>setPctR(p=>Math.min(100,p+5))}>−</button><span className="pct-val">{100-pctR}%</span><button className="pct-btn" onClick={()=>setPctR(p=>Math.max(0,p-5))}>+</button></div></div>
+          </div>
+        )}
+        {totalN>0&&(
+          <div className="calc-result">
+            <div className="calc-result-item"><span className="calc-avatar calc-r">R</span><div><span className="calc-result-name">Ronaldo</span><span className="calc-result-val">{fmt(valR)}</span></div></div>
+            <div className="calc-result-item"><span className="calc-avatar calc-v">V</span><div><span className="calc-result-name">Vanessa</span><span className="calc-result-val">{fmt(valV)}</span></div></div>
+          </div>
+        )}
+        <div className="calc-keys">
+          {btns.map((row,i)=><div key={i} className="calc-row">{row.map(b=><button key={b} className="calc-key" onClick={()=>b==="⌫"?pressBack():b==="."?pressDecimal():pressNum(b)}>{b}</button>)}</div>)}
+          <button className="calc-key calc-clear" onClick={()=>setTotal("")}>Limpar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MonthNav({mes,onChange}){
+  const [y,m]=mes.split("-").map(Number);
+  function prev(){ const d=new Date(y,m-2,1); onChange(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")); }
+  function next(){ const d=new Date(y,m,1);   onChange(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")); }
+  return <div className="month-nav"><button className="month-btn" onClick={prev}>‹</button><span className="month-label">{MONTH_NAMES[m-1]} {y}</span><button className="month-btn" onClick={next}>›</button></div>;
+}
+
+function SalarioInline({value,onChange}){
+  const [editing,setEditing]=useState(false);
+  const [val,setVal]=useState(value);
+  const ref=useRef();
+  useEffect(()=>{ if(editing&&ref.current) ref.current.focus(); },[editing]);
+  function confirm(){ onChange(parseFloat(val)||0); setEditing(false); }
+  if(editing) return <div className="sal-edit"><input ref={ref} className="sal-input" type="number" value={val} onChange={e=>setVal(e.target.value)} onBlur={confirm} onKeyDown={e=>e.key==="Enter"&&confirm()}/></div>;
+  return <button className="sal-value" onClick={()=>{setVal(value);setEditing(true);}}>{fmt(value)} <span className="sal-pencil">✎</span></button>;
+}
+
+function HomeTab({totais,salario,porForma,records,onFormaClick}){
+  const saldoPositivo=totais.saldo>=0;
+  const pctGasto=salario>0?Math.min(100,Math.round(totais.total/salario*100)):0;
+  const catMap={};
+  records.forEach(r=>{ const k=r.categoria||"OUTROS"; catMap[k]=(catMap[k]||0)+(parseFloat(r.ronaldo)||0)+(parseFloat(r.vanessa)||0); });
+  const topCats=Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const maxCat=topCats[0]?topCats[0][1]:1;
+  return(
+    <div className="page">
+      <div className="saldo-card">
+        <div className="saldo-top">
+          <div><p className="saldo-label">Saldo do Mês</p><p className={"saldo-value "+(saldoPositivo?"pos":"neg")}>{fmt(totais.saldo)}</p></div>
+          <div className="saldo-ring">
+            <svg width="64" height="64" viewBox="0 0 64 64">
+              <circle cx="32" cy="32" r="27" fill="none" stroke="#ffffff18" strokeWidth="6"/>
+              <circle cx="32" cy="32" r="27" fill="none" stroke={saldoPositivo?"#4ade80":"#f87171"} strokeWidth="6"
+                strokeDasharray={(pctGasto*1.696)+" 169.6"} strokeLinecap="round" strokeDashoffset="42.4"
+                style={{transform:"rotate(-90deg)",transformOrigin:"center"}}/>
+            </svg>
+            <span className="ring-pct">{pctGasto}%</span>
+          </div>
+        </div>
+        <div className="saldo-row">
+          <div className="saldo-item"><span className="saldo-item-label">Receita</span><span className="saldo-item-val green">{fmtShort(salario)}</span></div>
+          <div className="saldo-divider"/>
+          <div className="saldo-item"><span className="saldo-item-label">Despesas</span><span className="saldo-item-val red">{fmtShort(totais.total)}</span></div>
+          <div className="saldo-divider"/>
+          <div className="saldo-item"><span className="saldo-item-label">Pago</span><span className="saldo-item-val">{fmtShort(totais.pago)}</span></div>
+          <div className="saldo-divider"/>
+          <div className="saldo-item"><span className="saldo-item-label">A pagar</span><span className="saldo-item-val yellow">{fmtShort(totais.pendente)}</span></div>
+        </div>
+      </div>
+      <section className="section">
+        <p className="section-title">Por Forma de Pagamento</p>
+        {Object.keys(porForma).length===0&&<p className="empty-small">Nenhuma despesa no mês</p>}
+        <div className="cards-scroll">
+          {FORMAS_PAGAMENTO.filter(f=>porForma[f.id]).map(f=>{
+            const d=porForma[f.id]; const pp=d.total?Math.round(d.pago/d.total*100):0;
+            return <button key={f.id} className="pay-card" style={{"--cor":f.cor}} onClick={()=>onFormaClick(f.id)}>
+              <div className="pay-card-top"><span className="pay-icon">{f.icon}</span><span className="pay-short">{f.short}</span></div>
+              <p className="pay-total">{fmt(d.total)}</p>
+              <div className="pay-bar"><div className="pay-fill" style={{width:pp+"%"}}/></div>
+              <div className="pay-meta">{d.count} desp. · {pp}% pago</div>
+            </button>;
+          })}
+        </div>
+      </section>
+      {topCats.length>0&&(
+        <section className="section">
+          <p className="section-title">Top Categorias</p>
+          <div className="cat-list">
+            {topCats.map(([k,v])=>{ const ci=getCatInfo(k); return <div key={k} className="cat-row"><span className="cat-icon">{ci.icon}</span><div className="cat-info"><div className="cat-name-row"><span className="cat-name">{ci.label}</span><span className="cat-val">{fmt(v)}</span></div><div className="cat-bar-wrap"><div className="cat-bar-fill" style={{width:Math.round(v/maxCat*100)+"%"}}/></div></div></div>; })}
+          </div>
+        </section>
+      )}
+      <section className="section">
+        <p className="section-title">Divisão</p>
+        <div className="split-card">
+          <div className="split-person"><span className="split-avatar">R</span><span className="split-name">Ronaldo</span><span className="split-val">{fmt(totais.ronaldo)}</span></div>
+          <div className="split-bar-wrap">{totais.total>0&&<><div className="split-bar-r" style={{flex:totais.ronaldo}}/><div className="split-bar-v" style={{flex:totais.vanessa}}/></>}</div>
+          <div className="split-person right"><span className="split-val">{fmt(totais.vanessa)}</span><span className="split-name">Vanessa</span><span className="split-avatar v">V</span></div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DespesasTab({records,allRecords,formaFiltro,setFormaFiltro,onEdit,onDuplica,onDelete}){
+  const [search,setSearch]=useState("");
+  const filtered=useMemo(()=>!search?records:records.filter(x=>(x.fornecedor+x.categoria+x.despesaEsp).toLowerCase().includes(search.toLowerCase())),[records,search]);
+  const total=filtered.reduce((s,r)=>s+(parseFloat(r.ronaldo)||0)+(parseFloat(r.vanessa)||0),0);
+  return(
+    <div className="page">
+      <div className="chips-scroll">
+        <button className={"chip"+(!formaFiltro?" chip-on":"")} onClick={()=>setFormaFiltro(null)}>Todas</button>
+        {FORMAS_PAGAMENTO.filter(f=>allRecords.some(r=>r.forma===f.id)).map(f=>(
+          <button key={f.id} className={"chip"+(formaFiltro===f.id?" chip-on":"")} onClick={()=>setFormaFiltro(f.id)}>{f.icon} {f.short}</button>
+        ))}
+      </div>
+      <div className="search-wrap">
+        <span className="search-ico">🔍</span>
+        <input className="search-input" placeholder="Buscar despesa..." value={search} onChange={e=>setSearch(e.target.value)}/>
+        {search&&<button className="search-clear" onClick={()=>setSearch("")}>✕</button>}
+      </div>
+      <div className="desp-summary"><span className="desp-count">{filtered.length} despesa{filtered.length!==1?"s":""}</span><span className="desp-total">{fmt(total)}</span></div>
+      {filtered.length===0&&<div className="empty-state"><p>😕</p><p>Nenhuma despesa encontrada</p></div>}
+      {filtered.map(r=><RecordCard key={r.id} r={r} onEdit={onEdit} onDuplica={onDuplica} onDelete={onDelete}/>)}
+    </div>
+  );
+}
+
+function RecordCard({r,onEdit,onDuplica,onDelete}){
+  const [open,setOpen]=useState(false);
+  const ci=getCatInfo(r.categoria);
+  const fp=getForma(r.forma);
+  const total=(parseFloat(r.ronaldo)||0)+(parseFloat(r.vanessa)||0);
+  const sc={PAGO:"status-pago",PENDENTE:"status-pendente",COMPROMETIDO:"status-comprom"}[r.status]||"";
+  return(
+    <div className="rec-card" onClick={()=>setOpen(p=>!p)}>
+      <div className="rec-top">
+        <span className="rec-cat-icon">{ci.icon}</span>
+        <div className="rec-info"><span className="rec-fornecedor">{r.fornecedor||ci.label}</span><span className="rec-sub">{ci.label}{r.despesaEsp?" · "+r.despesaEsp:""}{r.parcela?" · Parc. "+r.parcela:""}</span></div>
+        <div className="rec-right"><span className="rec-total">{fmt(total)}</span><span className={"rec-status "+sc}>{r.status}</span></div>
+      </div>
+      {open&&(
+        <div className="rec-detail" onClick={e=>e.stopPropagation()}>
+          <div className="rec-detail-grid">
+            <Detail l="Forma" v={fp.icon+" "+fp.label}/><Detail l="Data" v={fmtDate(r.dataCompra)}/>
+            <Detail l="Vencimento" v={fmtDate(r.dataVenc)}/><Detail l="Tipo" v={r.tipo}/>
+            {parseFloat(r.ronaldo)>0&&<Detail l="Ronaldo" v={fmt(r.ronaldo)}/>}
+            {parseFloat(r.vanessa)>0&&<Detail l="Vanessa" v={fmt(r.vanessa)}/>}
+          </div>
+          <div className="rec-actions">
+            <button className="btn-edit" onClick={()=>onEdit(r)}>✏️ Editar</button>
+            <button className="btn-dup"  onClick={()=>onDuplica(r)}>📋 Duplicar</button>
+            <button className="btn-del"  onClick={()=>onDelete(r.id)}>🗑️</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Detail({l,v}){ return <div className="det-item"><span className="det-l">{l}</span><span className="det-v">{v||"—"}</span></div>; }
+
+function NovaTab({initial,onSave,onCancel,fornecedores,addFornecedor,mes,syncing,onCalc}){
+  const blank={periodo:mes,dataCompra:new Date().toISOString().slice(0,10),forma:"NUBANK_C",fornecedor:"",categoria:"ALIMENTACAO",despesaEsp:"",usarParcelas:false,totalParcelas:2,parcelaAtual:1,parcela:"",ronaldo:"",vanessa:"",status:"PENDENTE",tipo:"VARIAVEL",relevancia:"ESSENCIAL",dataVenc:""};
+  const [f,setF]=useState(()=>!initial?{...blank}:{...blank,...initial,usarParcelas:false,totalParcelas:2,parcelaAtual:1,ronaldo:initial.ronaldo??"",vanessa:initial.vanessa??""});
+  const [errors,setErrors]=useState({});
+  const [fornSug,setFornSug]=useState([]);
+  const [novoForn,setNovoForn]=useState("");
+  const [showAddForn,setShowAddForn]=useState(false);
+  function set(k,v){ setF(p=>({...p,[k]:v})); }
+  const parcelaTexto=f.usarParcelas?f.parcelaAtual+"/"+f.totalParcelas:f.parcela;
+  function handleFornInput(v){ set("fornecedor",v); if(v.length>1){ const q=v.toUpperCase(); setFornSug(fornecedores.filter(x=>x.includes(q)).slice(0,5)); } else setFornSug([]); }
+  function validate(){ const e={}; if(!f.categoria) e.categoria="Obrigatório"; if(!f.forma) e.forma="Obrigatório"; if((f.ronaldo===""||isNaN(f.ronaldo))&&(f.vanessa===""||isNaN(f.vanessa))) e.valor="Informe ao menos um valor"; setErrors(e); return Object.keys(e).length===0; }
+  function submit(){ if(!validate()) return; onSave({...f,parcela:parcelaTexto,ronaldo:parseFloat(f.ronaldo)||0,vanessa:parseFloat(f.vanessa)||0}); }
+  const totalPreview=(parseFloat(f.ronaldo)||0)+(parseFloat(f.vanessa)||0);
+  return(
+    <div className="page nova-page">
+      <div className="nova-header">
+        <button className="back-btn" onClick={onCancel}>‹</button>
+        <h2 className="nova-title">{initial&&initial.id?"Editar":initial?"Duplicar":"Nova Despesa"}</h2>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button className="calc-btn-sm" onClick={onCalc}>🧮</button>
+          <button className="save-btn-top" onClick={submit} disabled={syncing}>{syncing?"...":"Salvar"}</button>
+        </div>
+      </div>
+      <div className="valor-hero"><p className="valor-hero-label">Total</p><p className="valor-hero-num">{fmt(totalPreview)}</p></div>
+      <div className="form-section">
+        <p className="form-section-title">Categoria</p>
+        <div className="cat-picker">
+          {CATEGORIAS.map(c=><button key={c.key} className={"cat-chip"+(f.categoria===c.key?" cat-chip-on":"")} onClick={()=>set("categoria",c.key)}><span>{c.icon}</span><span className="cat-chip-label">{c.label}</span></button>)}
+        </div>
+      </div>
+      <div className="form-section">
+        <p className="form-section-title">Forma de Pagamento</p>
+        <div className="forma-picker">
+          {FORMAS_PAGAMENTO.map(fp=><button key={fp.id} className={"forma-chip"+(f.forma===fp.id?" forma-chip-on":"")} style={f.forma===fp.id?{"--cor":fp.cor}:{}} onClick={()=>set("forma",fp.id)}>{fp.icon} {fp.short}</button>)}
+        </div>
+        {errors.forma&&<span className="err-msg">{errors.forma}</span>}
+      </div>
+      <div className="form-section">
+        <p className="form-section-title">Fornecedor</p>
+        <div style={{position:"relative"}}>
+          <input className="f-input" placeholder="Digite ou selecione..." value={f.fornecedor} onChange={e=>handleFornInput(e.target.value)}/>
+          {fornSug.length>0&&<div className="forn-sug">{fornSug.map(s=><button key={s} className="forn-sug-item" onClick={()=>{set("fornecedor",s);setFornSug([]);}}>{s}</button>)}</div>}
+        </div>
+        <button className="link-btn" onClick={()=>setShowAddForn(p=>!p)}>+ Adicionar novo fornecedor</button>
+        {showAddForn&&<div className="add-forn-row"><input className="f-input" placeholder="Nome do fornecedor" value={novoForn} onChange={e=>setNovoForn(e.target.value)}/><button className="btn-add-forn" onClick={()=>{addFornecedor(novoForn);set("fornecedor",novoForn.toUpperCase());setNovoForn("");setShowAddForn(false);}}>OK</button></div>}
+      </div>
+      <div className="form-section">
+        <p className="form-section-title">Valores</p>
+        {errors.valor&&<span className="err-msg">{errors.valor}</span>}
+        <div className="two-col">
+          <div><label className="f-label">Ronaldo (R$)</label><input className="f-input" type="number" min="0" step="0.01" placeholder="0,00" value={f.ronaldo} onChange={e=>set("ronaldo",e.target.value)}/></div>
+          <div><label className="f-label">Vanessa (R$)</label><input className="f-input" type="number" min="0" step="0.01" placeholder="0,00" value={f.vanessa} onChange={e=>set("vanessa",e.target.value)}/></div>
+        </div>
+        <button className="link-btn" onClick={onCalc}>🧮 Usar calculadora de divisão</button>
+      </div>
+      <div className="form-section">
+        <p className="form-section-title">Parcelas</p>
+        <div className="toggle-row">
+          <span className="toggle-label">Compra parcelada?</span>
+          <button className={"toggle-btn"+(f.usarParcelas?" toggle-on":"")} onClick={()=>set("usarParcelas",!f.usarParcelas)}><div className="toggle-thumb"/></button>
+        </div>
+        {f.usarParcelas?(
+          <div style={{marginTop:12}}>
+            <div className="two-col">
+              <div><label className="f-label">Parcela atual</label><div className="stepper"><button className="stepper-btn" onClick={()=>set("parcelaAtual",Math.max(1,f.parcelaAtual-1))}>−</button><span className="stepper-val">{f.parcelaAtual}</span><button className="stepper-btn" onClick={()=>set("parcelaAtual",Math.min(f.totalParcelas,f.parcelaAtual+1))}>+</button></div></div>
+              <div><label className="f-label">Total parcelas</label><div className="stepper"><button className="stepper-btn" onClick={()=>set("totalParcelas",Math.max(f.parcelaAtual,f.totalParcelas-1))}>−</button><span className="stepper-val">{f.totalParcelas}</span><button className="stepper-btn" onClick={()=>set("totalParcelas",f.totalParcelas+1)}>+</button></div></div>
+            </div>
+            <div className="parcela-preview">Será salvo como: <strong>{f.parcelaAtual}/{f.totalParcelas}</strong></div>
+            <div style={{marginTop:8,display:"flex",flexWrap:"wrap",gap:6}}>
+              {[2,3,6,10,12,18,24,36,48].map(n=><button key={n} className={"parc-chip"+(f.totalParcelas===n?" parc-chip-on":"")} onClick={()=>{set("totalParcelas",n);if(f.parcelaAtual>n)set("parcelaAtual",1);}}>{n}x</button>)}
+            </div>
+          </div>
+        ):(
+          <div style={{marginTop:8}}><label className="f-label">Parcela (manual)</label><input className="f-input" placeholder="Ex: 3/12 ou deixe vazio" value={f.parcela} onChange={e=>set("parcela",e.target.value)}/></div>
+        )}
+      </div>
+      <div className="form-section">
+        <p className="form-section-title">Datas</p>
+        <div className="two-col">
+          <div><label className="f-label">Período</label><input className="f-input" type="month" value={f.periodo} onChange={e=>set("periodo",e.target.value)}/></div>
+          <div><label className="f-label">Data da Compra</label><input className="f-input" type="date" value={f.dataCompra} onChange={e=>set("dataCompra",e.target.value)}/></div>
+          <div><label className="f-label">Vencimento</label><input className="f-input" type="date" value={f.dataVenc} onChange={e=>set("dataVenc",e.target.value)}/></div>
+          <div><label className="f-label">Obs / Específico</label><input className="f-input" placeholder="Ex: Mercado, Remédio..." value={f.despesaEsp} onChange={e=>set("despesaEsp",e.target.value)}/></div>
+        </div>
+      </div>
+      <div className="form-section">
+        <p className="form-section-title">Classificação</p>
+        <div className="class-grid">
+          <div><label className="f-label">Status</label><div className="seg-ctrl">{STATUS_LIST.map(s=><button key={s} className={"seg-btn"+(f.status===s?" seg-on":"")} onClick={()=>set("status",s)}>{s}</button>)}</div></div>
+          <div><label className="f-label">Tipo</label><div className="seg-ctrl">{TIPOS_DESPESA.map(s=><button key={s} className={"seg-btn"+(f.tipo===s?" seg-on":"")} onClick={()=>set("tipo",s)}>{s}</button>)}</div></div>
+          <div><label className="f-label">Relevância</label><div className="seg-ctrl">{RELEVANCIA.map(s=><button key={s} className={"seg-btn"+(f.relevancia===s?" seg-on":"")} onClick={()=>set("relevancia",s)}>{s}</button>)}</div></div>
+        </div>
+      </div>
+      <div style={{height:16}}/>
+      <button className="btn-primary full" onClick={submit} disabled={syncing}>{syncing?"Salvando...":(initial&&initial.id?"Salvar Alterações":"Adicionar Despesa")}</button>
+      <div style={{height:32}}/>
+    </div>
+  );
+}
+
+function ConfigTab({fornecedores,setFornecedores,addFornecedor}){
+  const [novo,setNovo]=useState("");
+  return(
+    <div className="page">
+      <div className="form-section">
+        <p className="form-section-title">📋 Fornecedores</p>
+        <div className="add-forn-row">
+          <input className="f-input" placeholder="Novo fornecedor..." value={novo} onChange={e=>setNovo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&(addFornecedor(novo),setNovo(""))}/>
+          <button className="btn-add-forn" onClick={()=>{addFornecedor(novo);setNovo("");}}>+ Add</button>
+        </div>
+        <div className="forn-list">
+          {fornecedores.map(f=><div key={f} className="forn-item"><span className="forn-name">{f}</span><button className="forn-del" onClick={()=>setFornecedores(p=>p.filter(x=>x!==f))}>✕</button></div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Nunito',sans-serif;background:#f0f2f5;}
+.root{font-family:'Nunito',sans-serif;background:#f0f2f5;min-height:100vh;max-width:430px;margin:0 auto;position:relative;color:#1a1a2e;}
+.header{background:#fff;padding:14px 16px 10px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:40;box-shadow:0 1px 8px #0001;}
+.header-left{display:flex;flex-direction:column;gap:2px;}
+.app-name{font-size:22px;font-weight:900;color:#1a1a2e;letter-spacing:-0.5px;}
+.month-nav{display:flex;align-items:center;gap:6px;}
+.month-btn{background:none;border:none;font-size:20px;color:#6366f1;cursor:pointer;padding:0 4px;line-height:1;}
+.month-label{font-size:13px;font-weight:700;color:#64748b;}
+.header-sal{text-align:right;}
+.sal-label{display:block;font-size:10px;color:#94a3b8;font-weight:600;letter-spacing:.5px;text-transform:uppercase;}
+.sal-value{background:none;border:none;font-size:15px;font-weight:800;color:#10b981;cursor:pointer;display:flex;align-items:center;gap:4px;}
+.sal-pencil{font-size:12px;color:#94a3b8;}
+.sal-edit input{font-size:15px;font-weight:800;color:#10b981;border:none;border-bottom:2px solid #10b981;outline:none;background:transparent;width:110px;text-align:right;}
+.calc-btn{background:#f1f5f9;border:none;border-radius:10px;width:36px;height:36px;font-size:18px;cursor:pointer;}
+.calc-btn-sm{background:#ede9fe;border:none;border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer;}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#f59e0b;animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.spinner{width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.main{padding:12px 12px 90px;overflow-y:auto;}
+.page{display:flex;flex-direction:column;gap:14px;}
+.saldo-card{background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:20px;padding:20px;color:#fff;box-shadow:0 8px 24px #6366f140;}
+.saldo-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.saldo-label{font-size:12px;opacity:.8;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.saldo-value{font-size:28px;font-weight:900;letter-spacing:-1px;}
+.saldo-value.pos{color:#a7f3d0;}.saldo-value.neg{color:#fca5a5;}
+.saldo-ring{position:relative;display:flex;align-items:center;justify-content:center;}
+.ring-pct{position:absolute;font-size:13px;font-weight:800;}
+.saldo-row{display:flex;justify-content:space-between;padding-top:12px;border-top:1px solid #ffffff25;}
+.saldo-item{flex:1;text-align:center;}
+.saldo-item-label{display:block;font-size:9px;opacity:.7;font-weight:600;text-transform:uppercase;letter-spacing:.4px;}
+.saldo-item-val{display:block;font-size:13px;font-weight:800;margin-top:2px;}
+.saldo-item-val.green{color:#a7f3d0;}.saldo-item-val.red{color:#fca5a5;}.saldo-item-val.yellow{color:#fde68a;}
+.saldo-divider{width:1px;background:#ffffff20;margin:0 4px;}
+.section{display:flex;flex-direction:column;gap:10px;}
+.section-title{font-size:13px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.6px;}
+.empty-small{font-size:13px;color:#94a3b8;text-align:center;padding:20px;}
+.cards-scroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;}
+.cards-scroll::-webkit-scrollbar{display:none;}
+.pay-card{min-width:140px;background:var(--cor);border:none;border-radius:16px;padding:14px;cursor:pointer;text-align:left;color:#fff;flex-shrink:0;transition:transform .15s;}
+.pay-card:active{transform:scale(.97);}
+.pay-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.pay-icon{font-size:20px;}.pay-short{font-size:10px;font-weight:800;opacity:.85;letter-spacing:.5px;}
+.pay-total{font-size:16px;font-weight:900;letter-spacing:-.5px;margin-bottom:8px;}
+.pay-bar{height:4px;background:#ffffff30;border-radius:2px;overflow:hidden;margin-bottom:6px;}
+.pay-fill{height:100%;background:#fff;border-radius:2px;}
+.pay-meta{font-size:10px;opacity:.75;font-weight:600;}
+.cat-list{background:#fff;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px;box-shadow:0 2px 8px #0001;}
+.cat-row{display:flex;align-items:center;gap:10px;}
+.cat-icon{font-size:22px;width:28px;text-align:center;}
+.cat-info{flex:1;}
+.cat-name-row{display:flex;justify-content:space-between;margin-bottom:4px;}
+.cat-name{font-size:13px;font-weight:700;color:#374151;}.cat-val{font-size:13px;font-weight:800;color:#1a1a2e;}
+.cat-bar-wrap{height:4px;background:#f1f5f9;border-radius:2px;overflow:hidden;}
+.cat-bar-fill{height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:2px;}
+.split-card{background:#fff;border-radius:16px;padding:14px;box-shadow:0 2px 8px #0001;}
+.split-person{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.split-person.right{flex-direction:row-reverse;}
+.split-avatar{width:30px;height:30px;border-radius:50%;background:#6366f1;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;flex-shrink:0;}
+.split-avatar.v{background:#f59e0b;}
+.split-name{font-size:12px;font-weight:700;color:#64748b;}.split-val{font-size:14px;font-weight:800;color:#1a1a2e;}
+.split-bar-wrap{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px;margin-bottom:8px;}
+.split-bar-r{background:#6366f1;border-radius:4px;}.split-bar-v{background:#f59e0b;border-radius:4px;}
+.chips-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;}
+.chips-scroll::-webkit-scrollbar{display:none;}
+.chip{flex-shrink:0;padding:7px 14px;border-radius:20px;border:1.5px solid #e2e8f0;background:#fff;font-size:12px;font-weight:700;color:#64748b;cursor:pointer;}
+.chip-on{background:#6366f1;border-color:#6366f1;color:#fff;}
+.search-wrap{display:flex;align-items:center;gap:8px;background:#fff;border-radius:12px;padding:10px 14px;box-shadow:0 2px 6px #0001;}
+.search-ico{font-size:16px;}
+.search-input{flex:1;border:none;outline:none;font-size:14px;font-family:inherit;color:#1a1a2e;background:transparent;}
+.search-clear{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;}
+.desp-summary{display:flex;justify-content:space-between;align-items:center;padding:0 2px;}
+.desp-count{font-size:12px;color:#94a3b8;font-weight:600;}.desp-total{font-size:14px;font-weight:800;color:#1a1a2e;}
+.empty-state{text-align:center;padding:40px;color:#94a3b8;font-size:14px;display:flex;flex-direction:column;gap:8px;}
+.rec-card{background:#fff;border-radius:16px;padding:14px;box-shadow:0 2px 6px #0001;cursor:pointer;}
+.rec-top{display:flex;align-items:center;gap:10px;}
+.rec-cat-icon{font-size:26px;flex-shrink:0;}
+.rec-info{flex:1;min-width:0;}
+.rec-fornecedor{display:block;font-size:14px;font-weight:800;color:#1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rec-sub{display:block;font-size:11px;color:#94a3b8;font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rec-right{text-align:right;flex-shrink:0;}
+.rec-total{display:block;font-size:15px;font-weight:900;color:#1a1a2e;}
+.rec-status{display:block;font-size:9px;font-weight:800;letter-spacing:.5px;margin-top:3px;padding:2px 6px;border-radius:4px;text-align:center;}
+.status-pago{background:#dcfce7;color:#16a34a;}.status-pendente{background:#fef3c7;color:#d97706;}.status-comprom{background:#ede9fe;color:#7c3aed;}
+.rec-detail{margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;}
+.rec-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.det-item{display:flex;flex-direction:column;gap:2px;}
+.det-l{font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.det-v{font-size:13px;font-weight:700;color:#374151;}
+.rec-actions{display:flex;gap:8px;}
+.btn-edit{flex:1;padding:9px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#6366f1;}
+.btn-dup{flex:1;padding:9px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#0891b2;}
+.btn-del{padding:9px 12px;border-radius:10px;border:1.5px solid #fee2e2;background:#fff;font-size:14px;cursor:pointer;}
+.nova-page{padding-top:0;}
+.nova-header{display:flex;align-items:center;justify-content:space-between;padding:14px 0 10px;background:#f0f2f5;position:sticky;top:0;z-index:30;}
+.back-btn{background:none;border:none;font-size:26px;color:#6366f1;cursor:pointer;line-height:1;padding:0 6px;}
+.nova-title{font-size:17px;font-weight:800;color:#1a1a2e;}
+.save-btn-top{background:#6366f1;color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:800;cursor:pointer;}
+.save-btn-top:disabled{opacity:.5;}
+.valor-hero{text-align:center;padding:16px 0 8px;}
+.valor-hero-label{font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.valor-hero-num{font-size:34px;font-weight:900;color:#1a1a2e;letter-spacing:-1px;}
+.form-section{background:#fff;border-radius:16px;padding:14px;box-shadow:0 2px 6px #0001;}
+.form-section-title{font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;}
+.f-label{display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;}
+.f-input{width:100%;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;color:#1a1a2e;outline:none;}
+.f-input:focus{border-color:#6366f1;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.err-msg{color:#ef4444;font-size:11px;font-weight:700;display:block;margin:4px 0;}
+.link-btn{background:none;border:none;color:#6366f1;font-size:12px;font-weight:700;cursor:pointer;padding:6px 0;display:block;}
+.cat-picker{display:flex;flex-wrap:wrap;gap:8px;}
+.cat-chip{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 10px;border-radius:12px;border:1.5px solid #e2e8f0;background:#f8fafc;cursor:pointer;min-width:52px;}
+.cat-chip span:first-child{font-size:20px;}
+.cat-chip-label{font-size:9px;font-weight:700;color:#64748b;text-align:center;}
+.cat-chip-on{border-color:#6366f1;background:#ede9fe;}
+.cat-chip-on .cat-chip-label{color:#6366f1;}
+.forma-picker{display:flex;flex-wrap:wrap;gap:8px;}
+.forma-chip{padding:8px 12px;border-radius:10px;border:1.5px solid #e2e8f0;background:#f8fafc;font-size:11px;font-weight:700;color:#64748b;cursor:pointer;}
+.forma-chip-on{border-color:var(--cor,#6366f1);background:var(--cor,#6366f1);color:#fff;}
+.forn-sug{position:absolute;left:0;right:0;background:#fff;border:1.5px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;z-index:20;box-shadow:0 4px 12px #0001;}
+.forn-sug-item{display:block;width:100%;text-align:left;padding:10px 14px;border:none;background:none;font-size:13px;font-weight:600;color:#374151;cursor:pointer;border-bottom:1px solid #f1f5f9;}
+.add-forn-row{display:flex;gap:8px;margin-top:8px;}
+.btn-add-forn{background:#6366f1;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;}
+.toggle-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.toggle-label{font-size:13px;font-weight:700;color:#374151;}
+.toggle-btn{width:44px;height:24px;border-radius:12px;background:#e2e8f0;border:none;cursor:pointer;position:relative;transition:background .2s;}
+.toggle-on{background:#6366f1;}
+.toggle-thumb{width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 4px #0002;}
+.toggle-on .toggle-thumb{left:22px;}
+.stepper{display:flex;align-items:center;gap:10px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:6px 10px;}
+.stepper-btn{background:none;border:none;font-size:20px;color:#6366f1;cursor:pointer;font-weight:900;width:24px;height:24px;display:flex;align-items:center;justify-content:center;}
+.stepper-val{flex:1;text-align:center;font-size:18px;font-weight:800;color:#1a1a2e;}
+.parcela-preview{margin-top:10px;background:#ede9fe;border-radius:8px;padding:8px 12px;font-size:13px;color:#6366f1;font-weight:700;text-align:center;}
+.parc-chip{padding:6px 12px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;font-size:12px;font-weight:700;color:#64748b;cursor:pointer;}
+.parc-chip-on{border-color:#6366f1;background:#ede9fe;color:#6366f1;}
+.seg-ctrl{display:flex;background:#f1f5f9;border-radius:8px;padding:2px;margin-bottom:10px;}
+.seg-btn{flex:1;padding:6px 4px;border:none;background:none;font-size:10px;font-weight:700;color:#64748b;cursor:pointer;border-radius:6px;text-transform:uppercase;letter-spacing:.3px;}
+.seg-on{background:#fff;color:#6366f1;box-shadow:0 1px 4px #0002;}
+.mb12{margin-bottom:12px;}
+.class-grid{display:flex;flex-direction:column;gap:10px;}
+.btn-primary{background:#6366f1;color:#fff;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:800;cursor:pointer;width:100%;}
+.btn-primary:disabled{opacity:.5;}
+.btn-danger{background:#ef4444;color:#fff;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;}
+.btn-ghost{background:#f1f5f9;color:#64748b;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;}
+.full{width:100%;}.mt8{margin-top:8px;}
+.forn-list{display:flex;flex-direction:column;gap:2px;max-height:400px;overflow-y:auto;margin-top:10px;}
+.forn-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f8fafc;border-radius:8px;}
+.forn-name{font-size:13px;font-weight:700;color:#374151;}
+.forn-del{background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px;padding:0 4px;}
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#fff;border-top:1px solid #e2e8f0;display:flex;align-items:center;padding:8px 0;z-index:40;box-shadow:0 -4px 20px #0001;}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:#94a3b8;cursor:pointer;padding:4px 0;}
+.nav-active{color:#6366f1;}
+.nav-label{font-size:10px;font-weight:700;letter-spacing:.3px;}
+.nav-fab{background:#6366f1;color:#fff;width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-top:-20px;box-shadow:0 4px 14px #6366f170;flex:none;}
+.overlay{position:fixed;inset:0;background:#00000050;z-index:60;display:flex;align-items:flex-end;}
+.sheet{width:100%;max-width:430px;margin:0 auto;background:#fff;border-radius:20px 20px 0 0;padding:20px 20px 24px;}
+.calc-sheet{padding-bottom:24px;}
+.sheet-handle{width:36px;height:4px;background:#e2e8f0;border-radius:2px;margin:0 auto 16px;}
+.sheet-title{font-size:17px;font-weight:800;text-align:center;margin-bottom:6px;}
+.sheet-sub{font-size:13px;color:#94a3b8;text-align:center;margin-bottom:20px;}
+.calc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.calc-title{font-size:15px;font-weight:800;color:#1a1a2e;}
+.close-btn{background:none;border:none;font-size:18px;color:#94a3b8;cursor:pointer;}
+.calc-display{background:#f8fafc;border-radius:14px;padding:14px 16px;margin-bottom:12px;text-align:right;}
+.calc-display-label{display:block;font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.calc-display-val{font-size:26px;font-weight:900;color:#1a1a2e;letter-spacing:-1px;}
+.pct-row{display:flex;align-items:center;background:#f8fafc;border-radius:12px;padding:12px;margin-bottom:12px;gap:8px;}
+.pct-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.pct-name{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;}
+.pct-val{font-size:18px;font-weight:900;color:#1a1a2e;min-width:40px;text-align:center;}
+.pct-btn{background:#fff;border:1.5px solid #e2e8f0;border-radius:8px;width:32px;height:32px;font-size:18px;cursor:pointer;font-weight:700;color:#6366f1;}
+.pct-divider{width:1px;height:40px;background:#e2e8f0;}
+.calc-result{display:flex;gap:10px;margin-bottom:14px;}
+.calc-result-item{flex:1;background:#f8fafc;border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;}
+.calc-avatar{width:32px;height:32px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;flex-shrink:0;}
+.calc-r{background:#6366f1;}.calc-v{background:#f59e0b;}
+.calc-result-name{display:block;font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;}
+.calc-result-val{display:block;font-size:15px;font-weight:900;color:#1a1a2e;}
+.calc-keys{display:flex;flex-direction:column;gap:8px;}
+.calc-row{display:flex;gap:8px;}
+.calc-key{flex:1;height:52px;background:#f1f5f9;border:none;border-radius:12px;font-size:20px;font-weight:700;color:#1a1a2e;cursor:pointer;font-family:inherit;}
+.calc-key:active{background:#e2e8f0;}
+.calc-clear{width:100%;height:44px;background:#fee2e2;color:#ef4444;font-size:14px;margin-top:4px;}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);padding:11px 22px;border-radius:12px;font-size:13px;font-weight:800;z-index:100;white-space:nowrap;box-shadow:0 4px 16px #0003;}
+.toast-success{background:#1a1a2e;color:#a7f3d0;}
+.toast-warn{background:#1a1a2e;color:#fca5a5;}
+.toast-error{background:#ef4444;color:#fff;}
+input[type=date]::-webkit-calendar-picker-indicator,input[type=month]::-webkit-calendar-picker-indicator{opacity:.5;}
+</style>
+</body>
+</html>
+ENDOFFILE
+echo "OK"
+Saída
+
+OK
+
+Presented file
+Concluído
+Baixe esse arquivo index.html e siga os passos:
+
+Passo 4 — Enviar o arquivo para o GitHub
+
+No seu repositório fluxo-financas no GitHub, clique em Add file → Upload files
+Arraste o arquivo index.html para a área de upload
+Clique em Commit changes
+Passo 5 — Ativar o GitHub Pages
+
+Clique em Settings (no menu do repositório)
+No menu lateral clique em Pages
+Em Branch selecione main e clique em Save
+Aguarde 2 minutos
+Depois disso seu app estará disponível em:
+https://SEU-USUARIO.github.com/fluxo-financas
+
+Me avisa quando concluir! 😊
+
+
+Index
+Código · HTML 
+
+
