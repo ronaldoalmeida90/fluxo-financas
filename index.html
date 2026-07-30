@@ -119,17 +119,28 @@ var LS_SALARIOS = "fluxo_salarios";
 function lsGet(key, def){ try { var v=localStorage.getItem(key); return v?JSON.parse(v):def; } catch(e){ return def; } }
 function lsSet(key, val){ try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){} }
 
-// ── SHEETS (fire-and-forget, sem bloquear o app) ────────────────────────
+// ── JSONP (contorna CORS) ───────────────────────────────────────────────
+function jsonp(params){
+  return new Promise(function(resolve, reject){
+    var cbName = "fluxoCb_" + Date.now();
+    var script = document.createElement("script");
+    var p = new URLSearchParams();
+    Object.entries(params).forEach(([k,v])=>{ if(v!==undefined&&v!==null) p.append(k,String(v)); });
+    p.append("callback", cbName);
+    script.src = API_URL + "?" + p.toString();
+    var timer = setTimeout(function(){ delete window[cbName]; document.body.removeChild(script); reject(new Error("timeout")); }, 10000);
+    window[cbName] = function(data){ clearTimeout(timer); delete window[cbName]; document.body.removeChild(script); resolve(data); };
+    script.onerror = function(){ clearTimeout(timer); delete window[cbName]; reject(new Error("error")); };
+    document.body.appendChild(script);
+  });
+}
+
 async function apiGet(params){
-  try {
-    const res = await fetch(buildUrl(params));
-    const text = await res.text();
-    return JSON.parse(text);
-  } catch(e){ return null; }
+  try { return await jsonp(params); } catch(e){ return null; }
 }
 
 async function apiSend(params){
-  try { fetch(buildUrl(params)); } catch(e){}
+  try { jsonp(params); } catch(e){}
   return true;
 }
 
