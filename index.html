@@ -111,75 +111,70 @@ function buildUrl(params){
   return API_URL+"?"+p.toString();
 }
 
+// ── LOCAL STORAGE ──────────────────────────────────────────────────────
+var LS_RECORDS  = "fluxo_records";
+var LS_FORNS    = "fluxo_fornecedores";
+var LS_SALARIOS = "fluxo_salarios";
+
+function lsGet(key, def){ try { var v=localStorage.getItem(key); return v?JSON.parse(v):def; } catch(e){ return def; } }
+function lsSet(key, val){ try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){} }
+
+// ── SHEETS (fire-and-forget, sem bloquear o app) ────────────────────────
 async function apiGet(params){
-  var proxies = [
-    "https://corsproxy.io/?url=",
-    "https://api.allorigins.win/raw?url=",
-  ];
-  for (var i = 0; i < proxies.length; i++) {
-    try {
-      const url = proxies[i] + encodeURIComponent(buildUrl(params));
-      const res = await fetch(url);
-      const text = await res.text();
-      const json = JSON.parse(text);
-      if (json !== null) return json;
-    } catch(e){ continue; }
-  }
-  return null;
+  try {
+    const res = await fetch(buildUrl(params));
+    const text = await res.text();
+    return JSON.parse(text);
+  } catch(e){ return null; }
 }
 
 async function apiSend(params){
-  var proxies = [
-    "https://corsproxy.io/?url=",
-    "https://api.allorigins.win/raw?url=",
-  ];
-  for (var i = 0; i < proxies.length; i++) {
-    try {
-      const url = proxies[i] + encodeURIComponent(buildUrl(params));
-      await fetch(url);
-      return true;
-    } catch(e){ continue; }
-  }
+  try { fetch(buildUrl(params)); } catch(e){}
   return true;
 }
 
 function App(){
-  const [records,setRecords]           = useState([]);
-  const [fornecedores,setFornecedores] = useState([...FORNECEDORES_BASE]);
-  const [salarios,setSalarios]         = useState({});
+  const [records,setRecords]           = useState(()=>lsGet(LS_RECORDS,[]));
+  const [fornecedores,setFornecedores] = useState(()=>[...new Set([...FORNECEDORES_BASE,...lsGet(LS_FORNS,[])])].sort());
+  const [salarios,setSalarios]         = useState(()=>lsGet(LS_SALARIOS,{}));
   const [mes,setMes]                   = useState(mesAtual());
   const [tab,setTab]                   = useState("home");
   const [editRec,setEditRec]           = useState(null);
   const [toast,setToast]               = useState(null);
   const [confirmDel,setConfirmDel]     = useState(null);
   const [formaFiltro,setFormaFiltro]   = useState(null);
-  const [loading,setLoading]           = useState(true);
+  const [loading,setLoading]           = useState(false);
   const [syncing,setSyncing]           = useState(false);
   const [showCalc,setShowCalc]         = useState(false);
+  const [showSync,setShowSync]         = useState(false);
 
   function showToast(msg,type="success"){ setToast({msg,type}); setTimeout(()=>setToast(null),2800); }
 
-  useEffect(()=>{
-    async function load(){
-      setLoading(true);
-      try {
-        const [desps,forns,cfg] = await Promise.all([
-          apiGet({action:"listar"}),
-          apiGet({action:"fornecedores"}),
-          apiGet({action:"config"}),
-        ]);
-        if(Array.isArray(desps)&&desps.length>0) setRecords(desps);
-        if(Array.isArray(forns)&&forns.length>0) setFornecedores([...new Set([...FORNECEDORES_BASE,...forns])].sort());
-        if(cfg&&typeof cfg==="object"){
-          const sals={};
-          Object.entries(cfg).forEach(([k,v])=>{ if(k.startsWith("salario_")) sals[k.replace("salario_","")]=parseFloat(v)||0; });
-          if(Object.keys(sals).length>0) setSalarios(sals);
-        }
-      } catch(e){ showToast("Erro ao carregar","error"); }
-      setLoading(false);
+  // Salva no localStorage sempre que mudar
+  useEffect(()=>{ lsSet(LS_RECORDS,records); },[records]);
+  useEffect(()=>{ lsSet(LS_FORNS,fornecedores.filter(f=>!FORNECEDORES_BASE.includes(f))); },[fornecedores]);
+  useEffect(()=>{ lsSet(LS_SALARIOS,salarios); },[salarios]);
+
+  // Sincronizar da planilha
+  async function sincronizar(){
+    setSyncing(true);
+    try {
+      const url = buildUrl({action:"listar"});
+      const res = await fetch(url);
+      const desps = await res.json();
+      if(Array.isArray(desps)&&desps.length>0){
+        setRecords(desps);
+        lsSet(LS_RECORDS,desps);
+        showToast(desps.length+" despesas sincronizadas ✓");
+      } else {
+        showToast("Nenhum dado encontrado na planilha","warn");
+      }
+    } catch(e){
+      showToast("Erro ao sincronizar — abra o link direto no navegador","error");
     }
-    load();
-  },[]);
+    setSyncing(false);
+    setShowSync(false);
+  }
 
   const salario   = salarios[mes]||0;
   const recsMes   = useMemo(()=>records.filter(r=>r.periodo===mes),[records,mes]);
@@ -211,41 +206,39 @@ function App(){
   },[recsMes,formaFiltro]);
 
   async function saveRecord(data){
-    setSyncing(true);
     const isUpdate = data.id && records.find(r=>String(r.id)===String(data.id));
     if(isUpdate){
-      setRecords(p=>p.map(r=>String(r.id)===String(data.id)?data:r));
-      await apiSend({action:"update",...data});
+      const updated = records.map(r=>String(r.id)===String(data.id)?data:r);
+      setRecords(updated);
+      apiSend({action:"update",...data});
       showToast("Despesa atualizada ✓");
     } else {
       const newRec={...data,id:gerarId()};
-      setRecords(p=>[...p,newRec]);
-      await apiSend({action:"save",...newRec});
-      showToast("Salvo na planilha ✓");
+      const updated = [...records,newRec];
+      setRecords(updated);
+      apiSend({action:"save",...newRec});
+      showToast("Despesa salva ✓");
     }
-    setSyncing(false);
     setTab("despesas"); setEditRec(null);
   }
 
-  async function deleteRecord(id){
-    setSyncing(true);
+  function deleteRecord(id){
     setRecords(p=>p.filter(r=>String(r.id)!==String(id)));
-    await apiSend({action:"delete",id});
+    apiSend({action:"delete",id});
     showToast("Excluída","warn");
-    setSyncing(false);
     setConfirmDel(null); setTab("despesas");
   }
 
-  async function saveSalario(valor){
+  function saveSalario(valor){
     setSalarios(p=>({...p,[mes]:valor}));
-    await apiSend({action:"saveConfig",chave:"salario_"+mes,valor});
+    apiSend({action:"saveConfig",chave:"salario_"+mes,valor});
   }
 
-  async function addFornecedor(nome){
+  function addFornecedor(nome){
     const n=nome.trim().toUpperCase();
     if(!n||fornecedores.includes(n)) return;
     setFornecedores(p=>[...p,n].sort());
-    await apiSend({action:"saveFornecedor",nome:n});
+    apiSend({action:"saveFornecedor",nome:n});
   }
 
   function openEdit(r){ setEditRec({...r}); setTab("nova"); }
@@ -254,7 +247,7 @@ function App(){
 
   if(loading) return React.createElement("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:"#f0f2f5",gap:16}},
     React.createElement("div",{className:"spinner"}),
-    React.createElement("p",{style:{color:"#64748b",fontWeight:700}},"Carregando sua planilha...")
+    React.createElement("p",{style:{color:"#64748b",fontWeight:700}},"Carregando...")
   );
 
   return (
@@ -268,6 +261,7 @@ function App(){
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             {tab==="home" && <div className="header-sal"><span className="sal-label">Salário</span><SalarioInline value={salario} onChange={saveSalario}/></div>}
             <button className="calc-btn" onClick={()=>setShowCalc(true)}>🧮</button>
+            <button className="calc-btn" onClick={()=>setShowSync(true)} title="Sincronizar com planilha">🔄</button>
             {syncing && <div className="sync-dot"/>}
           </div>
         </header>
@@ -294,6 +288,19 @@ function App(){
       </nav>
       {toast && <div className={"toast toast-"+toast.type}>{toast.msg}</div>}
       {showCalc && <Calculadora onClose={()=>setShowCalc(false)}/>}
+      {showSync && (
+        <div className="overlay" onClick={()=>setShowSync(false)}>
+          <div className="sheet" onClick={e=>e.stopPropagation()}>
+            <div className="sheet-handle"/>
+            <p className="sheet-title">🔄 Sincronizar</p>
+            <p className="sheet-sub">Busca todos os dados salvos na sua planilha do Google Sheets e substitui os dados locais.</p>
+            <button className={"btn-primary full"+(syncing?" disabled":"")} onClick={sincronizar} disabled={syncing}>
+              {syncing?"Sincronizando...":"Sincronizar da Planilha"}
+            </button>
+            <button className="btn-ghost full mt8" onClick={()=>setShowSync(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
       {confirmDel && (
         <div className="overlay" onClick={()=>setConfirmDel(null)}>
           <div className="sheet" onClick={e=>e.stopPropagation()}>
