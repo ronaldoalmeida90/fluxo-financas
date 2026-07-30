@@ -111,26 +111,21 @@ function buildUrl(params){
   return API_URL+"?"+p.toString();
 }
 
+var PROXY = "https://corsproxy.io/?url=";
+
 async function apiGet(params){
   try {
-    const url = buildUrl(params);
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    });
+    const url = PROXY + encodeURIComponent(buildUrl(params));
+    const res = await fetch(url);
     const text = await res.text();
     return JSON.parse(text);
-  } catch(e){
-    try {
-      const res2 = await fetch(buildUrl(params), {mode:"no-cors"});
-      return null;
-    } catch(e2){ return null; }
-  }
+  } catch(e){ return null; }
 }
 
 async function apiSend(params){
   try {
-    await fetch(buildUrl(params));
+    const url = PROXY + encodeURIComponent(buildUrl(params));
+    await fetch(url);
   } catch(e){}
   return true;
 }
