@@ -113,9 +113,19 @@ function buildUrl(params){
 
 async function apiGet(params){
   try {
-    const res = await fetch(buildUrl(params));
-    return await res.json();
-  } catch(e){ return null; }
+    const url = buildUrl(params);
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    const text = await res.text();
+    return JSON.parse(text);
+  } catch(e){
+    try {
+      const res2 = await fetch(buildUrl(params), {mode:"no-cors"});
+      return null;
+    } catch(e2){ return null; }
+  }
 }
 
 async function apiSend(params){
